@@ -1,54 +1,120 @@
-from typing import Optional
-from abc import ABC, abstractmethod
+from typing import Dict, Any
 import httpx
-from datetime import datetime, timedelta, timezone
-import jwt
+from datetime import datetime, timezone, timedelta
+from .exceptions import (
+    BadRequestError,
+    AuthenticationError,
+    ForbiddenError,
+    NotFoundError,
+    NetsapiensAPIError,
+)
 
 
-class AuthBase(ABC):
-    @abstractmethod
-    async def get_headers(self) -> dict:
-        """Method to retrieve headers for authentication."""
-        pass
+class AuthBase:
+    async def get_headers(self) -> Dict[str, str]:
+        """Retrieve headers for authentication."""
+        raise NotImplementedError("Must implement get_headers in subclass.")
+
+    async def get_token_info(self) -> Dict[str, Any]:
+        """Retrieve metadata about the current token."""
+        raise NotImplementedError("Must implement get_token_info in subclass.")
+
+    async def _request(self, method: str, url: str, headers=None, **kwargs):
+        """Helper method to manage HTTP requests with error handling."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.request(method, url, headers=headers, **kwargs)
+                response.raise_for_status()  # Raise for HTTP error statuses
+
+            return response.json()
+
+        except httpx.HTTPStatusError as exc:
+            # Handle Netsapiens-specific error messages
+            error_data = exc.response.json()
+            code = error_data.get("code", exc.response.status_code)
+            message = error_data.get("message", exc.response.text)
+
+            if exc.response.status_code == 400:
+                raise BadRequestError(code=code, message=message) from exc
+            elif exc.response.status_code == 401:
+                raise AuthenticationError(code=code, message=message) from exc
+            elif exc.response.status_code == 403:
+                raise ForbiddenError(code=code, message=message) from exc
+            elif exc.response.status_code == 404:
+                raise NotFoundError(code=code, message=message) from exc
+            else:
+                # For other HTTP errors, raise a general API error
+                raise NetsapiensAPIError(code=code, message=message) from exc
 
 
 class ApiKeyAuth(AuthBase):
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, server_url: str):
         self.api_key = api_key
+        self.server_url = server_url
 
-    async def get_headers(self) -> dict:
+    async def get_headers(self) -> Dict[str, str]:
+        """Return headers containing the API key."""
         return {"Authorization": f"Bearer {self.api_key}", "accept": "application/json"}
 
+    async def get_token_info(self) -> Dict[str, Any]:
+        """Retrieve API key metadata by making a request to the API."""
+        url = f"https://{self.server_url}/ns-api/v2/apikeys/~"
+        headers = await self.get_headers()
+        return await self._request("GET", url, headers=headers)
 
-class OAuth2Auth(AuthBase):
-    def __init__(self, client_id: str, client_secret: str, token_url: str):
+
+class JWTAuth(AuthBase):
+    def __init__(
+        self,
+        server_url: str,
+        client_id: str,
+        username: str,
+        password: str,
+        client_secret: str,
+    ):
+        self.server_url = server_url
         self.client_id = client_id
+        self.username = username
+        self.password = password
         self.client_secret = client_secret
-        self.token_url = token_url
         self.access_token = None
         self.token_expires_at = None
 
     async def _fetch_token(self):
-        """Fetches a new OAuth2 token."""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.token_url,
-                data={
-                    "grant_type": "client_credentials",
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                },
-            )
-            response.raise_for_status()
-            token_data = response.json()
-            self.access_token = token_data["access_token"]
-            expires_in = token_data.get("expires_in", 3600)
-            self.token_expires_at = datetime.now(timezone.utc) + timedelta(
-                seconds=expires_in
-            )
+        """Fetch a new JWT token."""
+        url = f"https://{self.server_url}/ns-api/v2/jwt"
+        response = await self._request(
+            "POST",
+            url,
+            headers={"content-type": "application/json", "accept": "application/json"},
+            json={
+                "grant_type": "password",
+                "client_id": self.client_id,
+                "username": self.username,
+                "password": self.password,
+                "client_secret": self.client_secret,
+            },
+        )
+        self.access_token = response["token"]
+        self.token_expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=60
+        )  # Set token expiry based on API info
 
-    async def get_headers(self) -> dict:
-        """Retrieve headers with a fresh token if needed."""
+    async def _refresh_token(self):
+        """Refresh the JWT token."""
+        url = f"https://{self.server_url}/ns-api/v2/jwt"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "accept": "application/json",
+        }
+        response = await self._request(
+            "POST", url, headers=headers, json={"grant_type": "refresh_token"}
+        )
+        self.access_token = response["token"]
+        self.token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=60)
+
+    async def get_headers(self) -> Dict[str, str]:
+        """Retrieve headers with a valid JWT token, refreshing if needed."""
         if not self.access_token or (
             self.token_expires_at
             and datetime.now(timezone.utc) >= self.token_expires_at
@@ -59,29 +125,8 @@ class OAuth2Auth(AuthBase):
             "accept": "application/json",
         }
 
-
-class JWTAuth(AuthBase):
-    def __init__(
-        self,
-        jwt_token: Optional[str] = None,
-        secret_key: Optional[str] = None,
-        algorithm: str = "HS256",
-    ):
-        self.jwt_token = jwt_token
-        self.secret_key = secret_key
-        self.algorithm = algorithm
-
-    def generate_token(self, payload: dict):
-        """Generate a new JWT token."""
-        if not self.secret_key:
-            raise ValueError("Secret key is required to generate a JWT")
-        self.jwt_token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
-
-    async def get_headers(self) -> dict:
-        """Retrieve headers with the JWT token."""
-        if not self.jwt_token:
-            raise ValueError("JWT token is required for authorization")
-        return {
-            "Authorization": f"Bearer {self.jwt_token}",
-            "accept": "application/json",
-        }
+    async def get_token_info(self) -> Dict[str, Any]:
+        """Retrieve JWT token metadata."""
+        url = f"https://{self.server_url}/ns-api/v2/jwt"
+        headers = await self.get_headers()
+        return await self._request("GET", url, headers=headers)
