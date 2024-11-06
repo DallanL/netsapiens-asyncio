@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Optional, Dict, Any
 from .auth import AuthBase
 
 
@@ -14,17 +14,59 @@ class MessageManager:
         self.server_url = server_url.rstrip("/")  # Ensure no trailing slash
         self.auth = auth
 
-    async def get_messagesessions_for_user(self, user_id: str) -> Dict[str, Any]:
-        """Retrieve all message sessions for a specific user. Placeholder until implemented."""
-        raise NotImplementedError(
-            "The method get_messagesessions_for_user() is not yet implemented."
-        )
+    async def get_messagesessions_for_user(
+        self, domain: str = "~", user: str = "~", limit: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Retrieve message sessions for a specific user in a domain.
 
-    async def get_messages_for_session(self, session_id: str) -> Dict[str, Any]:
-        """Retrieve all messages within a specific message session. Placeholder until implemented."""
-        raise NotImplementedError(
-            "The method get_messages_for_session() is not yet implemented."
+        Args:
+            domain (str): Domain name for the organization. Use "~" for the domain linked to the token/key.
+            user (str): User extension for the account. Use "~" for the user linked to the token/key.
+            limit (Optional[int]): Optional limit for the number of message sessions to retrieve.
+
+        Returns:
+            Dict[str, Any]: JSON response containing message sessions.
+
+        Raises:
+            Exception: If an error occurs during the request.
+        """
+        url = (
+            f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions"
         )
+        params = {"limit": limit} if limit else {}
+
+        response = await self.auth._request("GET", url, params=params)
+        return response
+
+    async def get_messages_for_session(
+        self,
+        domain: str = "~",
+        user: str = "~",
+        messagesession: str = "",
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Retrieve messages for a specific message session.
+
+        Args:
+            domain (str): Domain name for the organization. Use "~" for the domain linked to the token/key.
+            user (str): User extension for the account. Use "~" for the user linked to the token/key.
+            messagesession (str): Unique identifier of the message session.
+            limit (Optional[int]): Optional limit for the number of messages to retrieve.
+
+        Returns:
+            Dict[str, Any]: JSON response containing messages in the session.
+
+        Raises:
+            Exception: If an error occurs during the request.
+        """
+        url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions/{messagesession}/messages"
+        params = {"limit": limit} if limit else {}
+
+        # Use auth to make the request
+        response = await self.auth._request("GET", url, params=params)
+        return response
 
     async def send_message_chat(
         self, user_id: str, message_data: Dict[str, Any]
