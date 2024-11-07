@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from .auth import AuthBase
 
 
@@ -93,20 +93,44 @@ class MessageManager:
         )
 
     async def send_message_sms(
-        self, phone_number: str, sms_data: Dict[str, Any]
+        self,
+        domain: str,
+        user: str,
+        messagesession: str,
+        message: str,
+        destination: List[str],
+        from_number: str,
     ) -> Dict[str, Any]:
-        """Send an SMS message. Placeholder until implemented."""
-        raise NotImplementedError(
-            "The method send_message_sms() is not yet implemented."
-        )
+        """
+        Send a SMS message within a specified message session.
 
-    async def send_message_group_sms(
-        self, group_id: str, sms_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Send a group SMS message. Placeholder until implemented."""
-        raise NotImplementedError(
-            "The method send_message_group_sms() is not yet implemented."
-        )
+        Args:
+            domain (str): Domain name for the organization.
+            user (str): User extension for the account.
+            messagesession (str): Unique identifier of the message session (at least 32 alphanumeric characters).
+            message (str): The message text to be sent.
+            destination (List[str]): List of phone numbers or users to receive the message.
+            from_number (Optional[str]): The sender's number for outbound SMS (optional).
+
+        Returns:
+            Dict[str, Any]: JSON response indicating the result of the message send operation.
+
+        Raises:
+            Exception: If an error occurs during the request.
+        """
+        url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions/{messagesession}/messages"
+
+        # Construct the request body
+        payload = {
+            "type": "sms",
+            "message": message,
+            "destination": destination,
+            "from-number": from_number,
+        }
+
+        # Use auth to make the request
+        response = await self.auth._request("POST", url, json=payload)
+        return response
 
     async def send_message_mms(
         self, phone_number: str, mms_data: Dict[str, Any]
@@ -151,9 +175,50 @@ class MessageManager:
         )
 
     async def start_new_message_session(
-        self, session_data: Dict[str, Any]
+        self,
+        domain: str,
+        user: str,
+        type: str,
+        message: str,
+        destination: List[str],
+        from_number: Optional[str] = None,
+        data: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        size: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Start a new message session. Placeholder until implemented."""
-        raise NotImplementedError(
-            "The method start_new_message_session() is not yet implemented."
-        )
+        """
+        Start a new message session and send an initial message.
+
+        Args:
+            domain (str): Domain name for the organization.
+            user (str): User extension for the account.
+            type (str): Type of message to send (e.g., 'sms', 'mms', 'chat').
+            message (str): The message text to be sent.
+            destination (List[str]): List of phone numbers or users to receive the message.
+            from_number (Optional[str]): The sender's number for SMS (optional).
+            data (Optional[str]): Base64-encoded data for media (used only for MMS or media chat).
+            mime_type (Optional[str]): MIME type of the media file (used only for MMS or media chat).
+            size (Optional[int]): Size in bytes of the media file (used only for MMS or media chat).
+
+        Returns:
+            Dict[str, Any]: JSON response indicating the result of starting the session and sending the message.
+
+        Raises:
+            Exception: If an error occurs during the request.
+        """
+        url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messages"
+
+        # Construct the request body
+        payload = {"type": type, "message": message, "destination": destination}
+        if from_number:
+            payload["from-number"] = from_number
+        if data:
+            payload["data"] = data
+        if mime_type:
+            payload["mime-type"] = mime_type
+        if size:
+            payload["size"] = size
+
+        # Use auth to make the request
+        response = await self.auth._request("POST", url, json=payload)
+        return response
