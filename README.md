@@ -7,5 +7,5 @@ An asynchronous Python client library for the Netsapiens PBX API, providing easy
 Install via pip:
 
 ```bash
-pip install netsapiens-asyncio
+pip install git+https://github.com/DallanL/netsapiens-asyncio.git
 ```
