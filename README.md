@@ -9,3 +9,11 @@ Install via pip:
 ```bash
 pip install git+https://github.com/DallanL/netsapiens-asyncio.git
 ```
+
+## Upgrade to latest library
+
+Upgrade via pip:
+
+```bash
+pip install --upgrade git+https://github.com/DallanL/netsapiens-asyncio.git
+```
