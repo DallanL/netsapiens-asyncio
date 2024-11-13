@@ -19,20 +19,32 @@ class AuthBase:
         """Retrieve metadata about the current token."""
         raise NotImplementedError("Must implement get_token_info in subclass.")
 
-    async def _request(self, method: str, url: str, headers=None, **kwargs):
+    async def _request(
+        self, method: str, url: str, headers=None, **kwargs
+    ) -> Dict[str, Any]:
         """Helper method to manage HTTP requests with error handling."""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, url, headers=headers, **kwargs)
                 response.raise_for_status()  # Raise for HTTP error statuses
 
-            return response.json()
+            # Attempt to parse response as JSON if content exists
+            try:
+                return response.json() if response.content else {}
+            except ValueError:
+                # Return raw text if JSON parsing fails
+                return {"text": response.text}
 
         except httpx.HTTPStatusError as exc:
             # Handle Netsapiens-specific error messages
-            error_data = exc.response.json()
-            code = error_data.get("code", exc.response.status_code)
-            message = error_data.get("message", exc.response.text)
+            try:
+                error_data = exc.response.json()
+                code = error_data.get("code", exc.response.status_code)
+                message = error_data.get("message", exc.response.text)
+            except ValueError:
+                # If error response is not JSON, use raw text
+                code = exc.response.status_code
+                message = exc.response.text
 
             if exc.response.status_code == 400:
                 raise BadRequestError(code=code, message=message) from exc
