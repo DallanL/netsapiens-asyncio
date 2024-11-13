@@ -102,7 +102,7 @@ class MessageManager:
         from_number: str,
     ) -> Dict[str, Any]:
         """
-        Send a SMS message within a specified message session.
+        Send an SMS message within a specified message session, supporting both v1 and v2 APIs.
 
         Args:
             domain (str): Domain name for the organization.
@@ -110,7 +110,7 @@ class MessageManager:
             messagesession (str): Unique identifier of the message session (at least 32 alphanumeric characters).
             message (str): The message text to be sent.
             destination (List[str]): List of phone numbers or users to receive the message.
-            from_number (Optional[str]): The sender's number for outbound SMS (optional).
+            from_number (str): The sender's number for outbound SMS.
 
         Returns:
             Dict[str, Any]: JSON response indicating the result of the message send operation.
@@ -118,18 +118,40 @@ class MessageManager:
         Raises:
             Exception: If an error occurs during the request.
         """
-        url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions/{messagesession}/messages"
+        # Determine if we're using v1 or v2 API based on the `apiv1` flag
+        token_info = await self.auth.get_token_info()
+        if token_info.get("apiv1", False):
+            # v1 API format
+            url = f"https://{self.server_url}/ns-api/"
+            # Prepare data as form fields for v1 API
+            payload = {
+                "object": "message",
+                "action": "create",
+                "domain": domain,
+                "user": user,
+                "type": "sms",
+                "session_id": messagesession,
+                "from_num": from_number,
+                "destination": ",".join(
+                    destination
+                ),  # Join list of destinations into a single string
+                "message": message,
+            }
+            # Send request with multipart form data
+            response = await self.auth._request("POST", url, data=payload)
+        else:
+            # v2 API format
+            url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions/{messagesession}/messages"
+            # Construct the JSON payload for v2 API
+            payload = {
+                "type": "sms",
+                "message": message,
+                "destination": destination,
+                "from-number": from_number,
+            }
+            # Send request with JSON payload
+            response = await self.auth._request("POST", url, json=payload)
 
-        # Construct the request body
-        payload = {
-            "type": "sms",
-            "message": message,
-            "destination": destination,
-            "from-number": from_number,
-        }
-
-        # Use auth to make the request
-        response = await self.auth._request("POST", url, json=payload)
         return response
 
     async def send_message_mms(
