@@ -26,17 +26,21 @@ class AuthBase:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, url, headers=headers, **kwargs)
-                response.raise_for_status()  # Raise for HTTP error statuses
+                response.raise_for_status()  # Raise an error for HTTP statuses
 
             # Attempt to parse response as JSON if content exists
-            try:
-                return response.json() if response.content else {}
-            except ValueError:
-                # Return raw text if JSON parsing fails
-                return {"text": response.text}
+            if response.content:
+                try:
+                    return response.json()
+                except ValueError:
+                    # Return raw text if JSON parsing fails
+                    return {"text": response.text}
+            else:
+                # Return empty dictionary if no content in response
+                return {}
 
         except httpx.HTTPStatusError as exc:
-            # Handle Netsapiens-specific error messages
+            # Attempt to handle Netsapiens-specific error messages
             try:
                 error_data = exc.response.json()
                 code = error_data.get("code", exc.response.status_code)
@@ -46,6 +50,7 @@ class AuthBase:
                 code = exc.response.status_code
                 message = exc.response.text
 
+            # Raise appropriate custom error based on status code
             if exc.response.status_code == 400:
                 raise BadRequestError(code=code, message=message) from exc
             elif exc.response.status_code == 401:
