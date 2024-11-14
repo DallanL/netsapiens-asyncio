@@ -26,6 +26,7 @@ class AuthBase:
     ) -> Dict[str, Any]:
         """Helper method to manage HTTP requests with error handling."""
 
+        logging.debug(f"URL '{url}'")
         # Correct common protocol typos and enforce https:// if needed
         if not url.startswith("https://"):
             # Check for common protocol typos and strip unsupported protocols
