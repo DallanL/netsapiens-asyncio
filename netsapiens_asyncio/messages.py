@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, List
 from .auth import AuthBase
+import logging
 
 
 class MessageManager:
@@ -72,6 +73,7 @@ class MessageManager:
         self, user_id: str, message_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Send a message in a chat session. Placeholder until implemented."""
+        logging.debug(f"{user_id} {message_data}")
         raise NotImplementedError(
             "The method send_message_chat() is not yet implemented."
         )
@@ -80,6 +82,7 @@ class MessageManager:
         self, group_id: str, message_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Send a message in a group chat. Placeholder until implemented."""
+        logging.debug(f"{group_id} {message_data}")
         raise NotImplementedError(
             "The method send_message_group_chat() is not yet implemented."
         )
@@ -88,6 +91,7 @@ class MessageManager:
         self, user_id: str, media_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Send a media message in a chat session. Placeholder until implemented."""
+        logging.debug(f"{user_id} {media_data}")
         raise NotImplementedError(
             "The method send_message_media_chat() is not yet implemented."
         )
@@ -118,12 +122,22 @@ class MessageManager:
         Raises:
             Exception: If an error occurs during the request.
         """
+        # Log method entry and input arguments
+        logging.debug("Entering send_message_sms")
+        logging.debug(f"Domain: {domain}")
+        logging.debug(f"User: {user}")
+        logging.debug(f"Message Session: {messagesession}")
+        logging.debug(f"Message: {message}")
+        logging.debug(f"Destination: {destination}")
+        logging.debug(f"From Number: {from_number}")
+
         # Determine if we're using v1 or v2 API based on the `apiv1` flag
         token_info = await self.auth.get_token_info()
+        logging.debug(f"Token Info: {token_info}")
+
         if token_info.get("apiv1", False):
             # v1 API format
             url = f"https://{self.server_url}/ns-api/"
-            # Prepare data as form fields for v1 API
             payload = {
                 "object": "message",
                 "action": "create",
@@ -132,25 +146,38 @@ class MessageManager:
                 "type": "sms",
                 "session_id": messagesession,
                 "from_num": from_number,
-                "destination": ",".join(
-                    destination
-                ),  # Join list of destinations into a single string
+                "destination": ",".join(destination),
                 "message": message,
             }
+            logging.debug("Using v1 API format")
+            logging.debug(f"URL: {url}")
+            logging.debug(f"Payload (form data): {payload}")
+
             # Send request with multipart form data
             response = await self.auth._request("POST", url, data=payload)
         else:
             # v2 API format
             url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions/{messagesession}/messages"
-            # Construct the JSON payload for v2 API
             payload = {
                 "type": "sms",
                 "message": message,
                 "destination": destination,
                 "from-number": from_number,
             }
+            logging.debug("Using v2 API format")
+            logging.debug(f"URL: {url}")
+            logging.debug(f"Payload (JSON): {payload}")
+
             # Send request with JSON payload
             response = await self.auth._request("POST", url, json=payload)
+
+        # Log response details
+        logging.debug("Response received")
+        logging.debug(f"Response Status Code: {response.get('status_code')}")
+        logging.debug(f"Response Headers: {response.get('headers')}")
+        logging.debug(
+            f"Response Content: {response.get('text') or response.get('json')}"
+        )
 
         return response
 
@@ -158,6 +185,7 @@ class MessageManager:
         self, phone_number: str, mms_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Send an MMS message. Placeholder until implemented."""
+        logging.debug(f"{phone_number} {mms_data}")
         raise NotImplementedError(
             "The method send_message_mms() is not yet implemented."
         )
@@ -166,12 +194,14 @@ class MessageManager:
         self, session_id: str, participants_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update participants in a message session. Placeholder until implemented."""
+        logging.debug(f"{session_id} {participants_data}")
         raise NotImplementedError(
             "The method update_messagesession_participants() is not yet implemented."
         )
 
     async def delete_messagesession(self, session_id: str) -> Dict[str, Any]:
         """Delete a specific message session. Placeholder until implemented."""
+        logging.debug(f"{session_id}")
         raise NotImplementedError(
             "The method delete_messagesession() is not yet implemented."
         )
@@ -180,18 +210,21 @@ class MessageManager:
         self, session_id: str, name_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update the name of a message session. Placeholder until implemented."""
+        logging.debug(f"{session_id} {name_data}")
         raise NotImplementedError(
             "The method update_messagesession_name() is not yet implemented."
         )
 
     async def update_messagesession_leave(self, session_id: str) -> Dict[str, Any]:
         """Leave a message session. Placeholder until implemented."""
+        logging.debug(f"{session_id}")
         raise NotImplementedError(
             "The method update_messagesession_leave() is not yet implemented."
         )
 
     async def get_messagesessions_for_domain(self, domain: str) -> Dict[str, Any]:
         """Retrieve all message sessions for a specific domain. Placeholder until implemented."""
+        logging.debug(f"{domain}")
         raise NotImplementedError(
             "The method get_messagesessions_for_domain() is not yet implemented."
         )
