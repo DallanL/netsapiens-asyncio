@@ -26,7 +26,6 @@ class AuthBase:
     ) -> Dict[str, Any]:
         """Helper method to manage HTTP requests with error handling."""
 
-        logging.debug(f"URL '{url}'")
         # Correct common protocol typos and enforce https:// if needed
         if not url.startswith("https://"):
             # Check for common protocol typos and strip unsupported protocols
@@ -39,6 +38,7 @@ class AuthBase:
             url = f"https://{corrected_url}"
         try:
             async with httpx.AsyncClient() as client:
+                logging.debug(f"URL '{url}'")
                 response = await client.request(method, url, headers=headers, **kwargs)
                 response.raise_for_status()  # Raise an error for HTTP statuses
 
