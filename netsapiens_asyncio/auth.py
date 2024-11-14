@@ -28,25 +28,27 @@ class AuthBase:
                 response = await client.request(method, url, headers=headers, **kwargs)
                 response.raise_for_status()  # Raise an error for HTTP statuses
 
-            # Attempt to parse response as JSON if content exists
-            if response.content:
-                try:
-                    return response.json()
-                except ValueError:
-                    # Return raw text if JSON parsing fails
-                    return {"text": response.text}
+            # Check Content-Type to decide how to handle response
+            if response.headers.get("Content-Type") == "application/json":
+                return response.json()
+            elif response.content:
+                return {"text": response.text}  # Return raw text if not JSON
             else:
-                # Return empty dictionary if no content in response
-                return {}
+                return {}  # Return empty dict if there's no content
 
         except httpx.HTTPStatusError as exc:
-            # Attempt to handle Netsapiens-specific error messages
+            # Handle Netsapiens-specific error messages
             try:
-                error_data = exc.response.json()
-                code = error_data.get("code", exc.response.status_code)
-                message = error_data.get("message", exc.response.text)
+                if exc.response.headers.get("Content-Type") == "application/json":
+                    error_data = exc.response.json()
+                    code = error_data.get("code", exc.response.status_code)
+                    message = error_data.get("message", exc.response.text)
+                else:
+                    # If error response is not JSON, use raw text
+                    code = exc.response.status_code
+                    message = exc.response.text
             except ValueError:
-                # If error response is not JSON, use raw text
+                # Fallback for unexpected parsing errors
                 code = exc.response.status_code
                 message = exc.response.text
 
