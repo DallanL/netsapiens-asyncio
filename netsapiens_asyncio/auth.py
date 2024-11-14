@@ -2,6 +2,7 @@ from typing import Dict, Any
 import httpx
 from datetime import datetime, timezone, timedelta
 import logging
+import re
 from .exceptions import (
     BadRequestError,
     AuthenticationError,
@@ -24,6 +25,17 @@ class AuthBase:
         self, method: str, url: str, headers=None, **kwargs
     ) -> Dict[str, Any]:
         """Helper method to manage HTTP requests with error handling."""
+
+        # Correct common protocol typos and enforce https:// if needed
+        if not url.startswith("https://"):
+            # Check for common protocol typos and strip unsupported protocols
+            corrected_url = re.sub(
+                r"^\w+://", "", url
+            )  # Remove existing protocol if invalid
+            logging.debug(
+                f"Correcting protocol for URL '{url}' to 'https://{corrected_url}'"
+            )
+            url = f"https://{corrected_url}"
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, url, headers=headers, **kwargs)
