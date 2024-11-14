@@ -177,24 +177,29 @@ class OAuth2Auth(AuthBase):
         self.token_expires_at = None
         self.primary_token_url = f"https://{self.server_url}/ns-api/v2/tokens"
         self.fallback_token_url = f"https://{self.server_url}/ns-api/oauth2/token/"
+        self.token_data = {}  # Store token data and metadata here
 
     async def _fetch_token(self):
         """Fetch a new OAuth2 token using the resource owner credentials grant."""
         token_url = self.primary_token_url
         try:
             response = await self._request_token(token_url)
+            self.token_data = response  # Store token response data
+            self.token_data["apiv1"] = False  # Indicate V2 API was used
         except NetsapiensAPIError as e:
             # Check if response appears to be HTML, indicating a fallback is needed
             if "<html" in e.message.lower():
                 # Retry with fallback URL if primary URL response suggests an HTML error page
                 token_url = self.fallback_token_url
                 response = await self._request_token(token_url)
+                self.token_data = response  # Store token response data
+                self.token_data["apiv1"] = True  # Indicate V1 API was used
             else:
                 raise e
 
-        # Extract token details from response
-        self.access_token = response["access_token"]
-        expires_in = response.get("expires_in", 3600)
+        # Extract token details
+        self.access_token = self.token_data["access_token"]
+        expires_in = self.token_data.get("expires_in", 3600)
         self.token_expires_at = datetime.now(timezone.utc) + timedelta(
             seconds=expires_in
         )
@@ -227,10 +232,5 @@ class OAuth2Auth(AuthBase):
         }
 
     async def get_token_info(self) -> Dict[str, Any]:
-        """Retrieve OAuth2 token metadata."""
-        return {
-            "access_token": self.access_token,
-            "expires_at": self.token_expires_at,
-            "client_id": self.client_id,
-            "username": self.username,
-        }
+        """Return the token data and metadata."""
+        return self.token_data
