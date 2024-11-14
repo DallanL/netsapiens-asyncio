@@ -1,4 +1,5 @@
 from typing import Dict, Any
+from abc import ABC, abstractmethod
 import httpx
 from datetime import datetime, timezone, timedelta
 import logging
@@ -12,11 +13,13 @@ from .exceptions import (
 )
 
 
-class AuthBase:
+class AuthBase(ABC):
+    @abstractmethod
     async def get_headers(self) -> Dict[str, str]:
         """Retrieve headers for authentication."""
         raise NotImplementedError("Must implement get_headers in subclass.")
 
+    @abstractmethod
     async def get_token_info(self) -> Dict[str, Any]:
         """Retrieve metadata about the current token."""
         raise NotImplementedError("Must implement get_token_info in subclass.")
