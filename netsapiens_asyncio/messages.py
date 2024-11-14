@@ -137,7 +137,7 @@ class MessageManager:
 
         if token_info.get("apiv1", False):
             # v1 API format
-            url = f"https://{self.server_url}/ns-api/"
+            url = f"{self.server_url}/ns-api/"
             payload = {
                 "object": "message",
                 "action": "create",
