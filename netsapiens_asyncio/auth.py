@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import httpx
 from datetime import datetime, timezone, timedelta
+import logging
 from .exceptions import (
     BadRequestError,
     AuthenticationError,
@@ -27,6 +28,13 @@ class AuthBase:
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, url, headers=headers, **kwargs)
                 response.raise_for_status()  # Raise an error for HTTP statuses
+
+            # Log response details for debugging
+            logging.debug(f"URL: {url}")
+            logging.debug(f"Method: {method}")
+            logging.debug(f"Response Status Code: {response.status_code}")
+            logging.debug(f"Response Headers: {response.headers}")
+            logging.debug(f"Response Content: {response.content}")
 
             # Check Content-Type to decide how to handle response
             if response.headers.get("Content-Type") == "application/json":
