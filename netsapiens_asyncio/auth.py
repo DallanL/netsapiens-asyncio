@@ -12,6 +12,8 @@ from .exceptions import (
     NetsapiensAPIError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class AuthBase(ABC):
     @abstractmethod
@@ -27,56 +29,70 @@ class AuthBase(ABC):
     async def _request(
         self, method: str, url: str, headers=None, **kwargs
     ) -> Dict[str, Any]:
-        """Helper method to manage HTTP requests with error handling."""
-        logging.debug("AuthBase._request - started")
-        # Correct common protocol typos and enforce https:// if needed
+        """Helper method to manage HTTP requests with error handling and detailed logging."""
+
+        # Log entry to the method
+        logger.debug("Entering AuthBase._request")
+        logger.debug(f"HTTP Method: {method}")
+        logger.debug(f"Initial URL: {url}")
+        logger.debug(f"Headers: {headers}")
+        logger.debug(f"Additional kwargs: {kwargs}")
+
+        # Correct the URL if protocol is missing or incorrect
         if not url.startswith("https://"):
-            # Check for common protocol typos and strip unsupported protocols
             corrected_url = re.sub(
                 r"^\w+://", "", url
             )  # Remove existing protocol if invalid
-            logging.debug(
-                f"Correcting protocol for URL '{url}' to 'https://{corrected_url}'"
-            )
             url = f"https://{corrected_url}"
+            logger.debug(f"Corrected URL to: {url}")
+
         try:
+            # Log the final URL and request details
             async with httpx.AsyncClient() as client:
-                logging.debug(f"URL '{url}'")
+                logger.debug(f"Sending request to URL: {url}")
                 response = await client.request(method, url, headers=headers, **kwargs)
-                response.raise_for_status()  # Raise an error for HTTP statuses
+                response.raise_for_status()  # Raise for HTTP error statuses
 
-            # Log response details for debugging
-            logging.debug(f"URL: {url}")
-            logging.debug(f"Method: {method}")
-            logging.debug(f"Response Status Code: {response.status_code}")
-            logging.debug(f"Response Headers: {response.headers}")
-            logging.debug(f"Response Content: {response.content}")
+            # Log response details
+            logger.debug("Request succeeded")
+            logger.debug(f"Response Status Code: {response.status_code}")
+            logger.debug(f"Response Headers: {response.headers}")
+            logger.debug(f"Response Content: {response.content}")
 
-            # Check Content-Type to decide how to handle response
+            # Check and parse the response based on Content-Type
             if response.headers.get("Content-Type") == "application/json":
-                return response.json()
+                json_response = response.json()
+                logger.debug(f"JSON Response: {json_response}")
+                return json_response
             elif response.content:
-                return {"text": response.text}  # Return raw text if not JSON
+                text_response = response.text
+                logger.debug(f"Text Response: {text_response}")
+                return {"text": text_response}
             else:
-                return {}  # Return empty dict if there's no content
+                logger.debug("Empty response received")
+                return {}
 
         except httpx.HTTPStatusError as exc:
-            # Handle Netsapiens-specific error messages
+            # Log HTTP error details
+            logger.error(f"HTTPStatusError occurred: {exc.response.status_code}")
+            logger.error(f"Response content: {exc.response.content}")
+
+            # Parse and log error content if available
             try:
                 if exc.response.headers.get("Content-Type") == "application/json":
                     error_data = exc.response.json()
                     code = error_data.get("code", exc.response.status_code)
                     message = error_data.get("message", exc.response.text)
                 else:
-                    # If error response is not JSON, use raw text
                     code = exc.response.status_code
                     message = exc.response.text
             except ValueError:
-                # Fallback for unexpected parsing errors
                 code = exc.response.status_code
                 message = exc.response.text
 
-            # Raise appropriate custom error based on status code
+            logger.error(f"Error Code: {code}, Message: {message}")
+
+            # Raise appropriate custom errors based on status code
             if exc.response.status_code == 400:
                 raise BadRequestError(code=code, message=message) from exc
             elif exc.response.status_code == 401:
@@ -86,8 +102,10 @@ class AuthBase(ABC):
             elif exc.response.status_code == 404:
                 raise NotFoundError(code=code, message=message) from exc
             else:
-                # For other HTTP errors, raise a general API error
                 raise NetsapiensAPIError(code=code, message=message) from exc
+        finally:
+            # Log exit from the method
+            logger.debug("Exiting AuthBase._request")
 
 
 class ApiKeyAuth(AuthBase):
