@@ -12,7 +12,7 @@ class MessageManager:
             server_url (str): Base URL of the Netsapiens API server.
             auth (AuthBase): An authentication instance (e.g., ApiKeyAuth or JWTAuth).
         """
-        self.server_url = server_url.rstrip("/")  # Ensure no trailing slash
+        self.server_url = server_url.rstrip("/")
         self.auth = auth
 
     async def get_messagesessions_for_user(
