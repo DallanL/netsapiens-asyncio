@@ -13,7 +13,6 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-logger.propagate = True
 
 
 class AuthBase(ABC):
