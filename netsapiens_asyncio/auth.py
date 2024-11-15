@@ -202,6 +202,10 @@ class OAuth2Auth(AuthBase):
         password: str,
         server_url: str,
     ):
+        # Log initialization details
+        logger.debug("Initializing OAuth2Auth")
+        logger.debug(f"Client ID: {client_id}, Server URL: {server_url}")
+
         self.client_id = client_id
         self.client_secret = client_secret
         self.username = username
@@ -211,47 +215,63 @@ class OAuth2Auth(AuthBase):
         self.token_expires_at = None
         self.primary_token_url = f"https://{self.server_url}/ns-api/v2/tokens"
         self.fallback_token_url = f"https://{self.server_url}/ns-api/oauth2/token/"
-        self.token_data = {}  # Store token data and metadata here
+        self.token_data = {}
 
     async def _fetch_token(self):
         """Fetch a new OAuth2 token using the resource owner credentials grant."""
         token_url = self.primary_token_url
+        logger.debug(f"Fetching new token from {token_url}")
+
         try:
             response = await self._request_token(token_url)
-            self.token_data = response  # Store token response data
+            self.token_data = response
             self.token_data["apiv1"] = False  # Indicate V2 API was used
+            logger.debug("Token fetched successfully from primary URL")
         except NetsapiensAPIError as e:
-            # Check if response appears to be HTML, indicating a fallback is needed
+            logger.error(f"Failed to fetch token from primary URL: {e.message}")
             if "<html" in e.message.lower():
-                # Retry with fallback URL if primary URL response suggests an HTML error page
+                logger.debug(
+                    "Primary token URL returned HTML; switching to fallback URL"
+                )
                 token_url = self.fallback_token_url
                 response = await self._request_token(token_url)
-                self.token_data = response  # Store token response data
+                self.token_data = response
                 self.token_data["apiv1"] = True  # Indicate V1 API was used
+                logger.debug("Token fetched successfully from fallback URL")
             else:
+                logger.error("Token fetch failed with non-HTML error")
                 raise e
 
-        # Extract token details
+        # Set access token and expiration
         self.access_token = self.token_data["access_token"]
         expires_in = self.token_data.get("expires_in", 3600)
         self.token_expires_at = datetime.now(timezone.utc) + timedelta(
             seconds=expires_in
         )
+        logger.debug(
+            f"Access token set. Expires in {expires_in} seconds at {self.token_expires_at}"
+        )
 
     async def _request_token(self, url: str) -> Dict[str, Any]:
         """Helper function to request a token from a given URL."""
-        return await self._request(
+        logger.debug(f"Requesting token from {url}")
+        payload = {
+            "grant_type": "password",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "username": self.username,
+            "password": self.password,
+        }
+        logger.debug(f"Token request payload: {payload}")
+
+        response = await self._request(
             "POST",
             url,
             headers={"content-type": "application/json", "accept": "application/json"},
-            json={
-                "grant_type": "password",
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "username": self.username,
-                "password": self.password,
-            },
+            json=payload,
         )
+        logger.debug(f"Token response: {response}")
+        return response
 
     async def get_headers(self) -> Dict[str, str]:
         """Retrieve headers with a valid OAuth2 token, refreshing if needed."""
@@ -259,12 +279,19 @@ class OAuth2Auth(AuthBase):
             self.token_expires_at
             and datetime.now(timezone.utc) >= self.token_expires_at
         ):
+            logger.debug("Access token is missing or expired; fetching a new token")
             await self._fetch_token()
-        return {
+        else:
+            logger.debug("Using existing access token")
+
+        headers = {
             "Authorization": f"Bearer {self.access_token}",
             "accept": "application/json",
         }
+        logger.debug(f"Returning headers: {headers}")
+        return headers
 
     async def get_token_info(self) -> Dict[str, Any]:
         """Return the token data and metadata."""
+        logger.debug("Returning token information")
         return self.token_data
