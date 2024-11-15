@@ -214,34 +214,22 @@ class OAuth2Auth(AuthBase):
         self.server_url = server_url
         self.access_token = None
         self.token_expires_at = None
-        self.primary_token_url = f"https://{self.server_url}/ns-api/v2/tokens"
-        self.fallback_token_url = f"https://{self.server_url}/ns-api/oauth2/token/"
+        self.token_url = f"https://{self.server_url}/ns-api/v2/tokens"
         self.token_data = {}
 
     async def _fetch_token(self):
         """Fetch a new OAuth2 token using the resource owner credentials grant."""
-        token_url = self.primary_token_url
-        logger.debug(f"Fetching new token from {token_url}")
+        logger.debug(f"Fetching new token from {self.token_url}")
 
         try:
-            response = await self._request_token(token_url)
+            # Request the token from the primary token URL
+            response = await self._request_token(self.token_url)
             self.token_data = response
-            self.token_data["apiv1"] = False  # Indicate V2 API was used
-            logger.debug("Token fetched successfully from primary URL")
+            logger.debug("Token fetched successfully")
+
         except NetsapiensAPIError as e:
-            logger.error(f"Failed to fetch token from primary URL: {e.message}")
-            if "<html" in e.message.lower():
-                logger.debug(
-                    "Primary token URL returned HTML; switching to fallback URL"
-                )
-                token_url = self.fallback_token_url
-                response = await self._request_token(token_url)
-                self.token_data = response
-                self.token_data["apiv1"] = True  # Indicate V1 API was used
-                logger.debug("Token fetched successfully from fallback URL")
-            else:
-                logger.error("Token fetch failed with non-HTML error")
-                raise e
+            logger.error(f"Failed to fetch token: {e.message}")
+            raise e
 
         # Set access token and expiration
         self.access_token = self.token_data["access_token"]
