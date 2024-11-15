@@ -3,6 +3,7 @@ from .auth import AuthBase
 import logging
 
 logger = logging.getLogger(__name__)
+logger.propagate = True
 
 
 class MessageManager:
