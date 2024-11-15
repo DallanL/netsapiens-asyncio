@@ -2,6 +2,8 @@ from typing import Optional, Dict, Any, List
 from .auth import AuthBase
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class MessageManager:
     def __init__(self, server_url: str, auth: AuthBase):
@@ -12,6 +14,9 @@ class MessageManager:
             server_url (str): Base URL of the Netsapiens API server.
             auth (AuthBase): An authentication instance (e.g., ApiKeyAuth or JWTAuth).
         """
+        logger.debug("Initializing MessageManager")
+        logger.debug(f"Server URL: {server_url}")
+
         self.server_url = server_url.rstrip("/")
         self.auth = auth
 
@@ -261,7 +266,9 @@ class MessageManager:
         Raises:
             Exception: If an error occurs during the request.
         """
+        # Construct URL for starting a new message session
         url = f"{self.server_url}/ns-api/v2/domains/{domain}/users/{user}/messages"
+        logger.debug(f"Constructed URL: {url}")
 
         # Construct the request body
         payload = {"type": type, "message": message, "destination": destination}
@@ -274,6 +281,32 @@ class MessageManager:
         if size:
             payload["size"] = size
 
-        # Use auth to make the request
-        response = await self.auth._request("POST", url, json=payload)
-        return response
+        # Log the payload details
+        logger.debug("Starting a new message session with the following details:")
+        logger.debug(f"Domain: {domain}, User: {user}")
+        logger.debug(f"Message Type: {type}")
+        logger.debug(f"Message: {message}")
+        logger.debug(f"Destination: {destination}")
+        if from_number:
+            logger.debug(f"From Number: {from_number}")
+        if data:
+            logger.debug(
+                f"Data (Base64): {data[:50]}..."
+            )  # Log only the first 50 chars for brevity
+        if mime_type:
+            logger.debug(f"MIME Type: {mime_type}")
+        if size:
+            logger.debug(f"Size: {size}")
+
+        try:
+            # Send the request and log the response
+            logger.debug("Sending request to start a new message session...")
+            response = await self.auth._request("POST", url, json=payload)
+            logger.debug(f"Response received: {response}")
+            return response
+
+        except Exception as e:
+            # Log any errors encountered during the request
+            logger.error("An error occurred while starting a new message session")
+            logger.error(f"Error details: {str(e)}")
+            raise e
