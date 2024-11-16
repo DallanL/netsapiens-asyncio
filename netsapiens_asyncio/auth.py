@@ -202,7 +202,6 @@ class OAuth2Auth(AuthBase):
         password: str,
         server_url: str,
     ):
-        # Log initialization details
         logger.debug("Initializing OAuth2Auth")
         logger.debug(f"Client ID: {client_id}, Server URL: {server_url}")
 
@@ -223,15 +222,18 @@ class OAuth2Auth(AuthBase):
         try:
             # Request the token from the primary token URL
             response = await self._request_token(self.token_url)
+            logger.debug(f"Full token response: {response}")
+
+            # Ensure that we are storing the entire response
             self.token_data = response
-            logger.debug("Token fetched successfully")
+            logger.debug(f"Token data stored: {self.token_data}")
 
         except NetsapiensAPIError as e:
             logger.error(f"Failed to fetch token: {e.message}")
             raise e
 
-        # Set access token and expiration
-        self.access_token = self.token_data["access_token"]
+        # Set access token and expiration based on full token data
+        self.access_token = self.token_data.get("access_token")
         expires_in = self.token_data.get("expires_in", 3600)
         self.token_expires_at = datetime.now(timezone.utc) + timedelta(
             seconds=expires_in
@@ -258,7 +260,7 @@ class OAuth2Auth(AuthBase):
             headers={"content-type": "application/json", "accept": "application/json"},
             json=payload,
         )
-        logger.debug(f"Token response: {response}")
+        logger.debug(f"Token response from server: {response}")
         return response
 
     async def get_headers(self) -> Dict[str, str]:
