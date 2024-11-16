@@ -13,6 +13,12 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 
 class AuthBase(ABC):
