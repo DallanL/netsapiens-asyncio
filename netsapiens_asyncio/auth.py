@@ -29,55 +29,50 @@ class AuthBase(ABC):
     async def _request(
         self, method: str, url: str, headers=None, **kwargs
     ) -> Dict[str, Any]:
-        """Helper method to manage HTTP requests with error handling and detailed logging."""
+        """Helper method to manage HTTP requests with error handling and logging."""
 
         # Log entry to the method
-        logger.debug("Entering AuthBase._request")
-        logger.debug(f"HTTP Method: {method}")
-        logger.debug(f"Initial URL: {url}")
-        logger.debug(f"Headers: {headers}")
-        logger.debug(f"Additional kwargs: {kwargs}")
+        logger.warning("Entering AuthBase._request")
+        logger.warning(f"HTTP Method: {method}")
+        logger.warning(f"Initial URL: {url}")
+        logger.warning(f"Headers: {headers}")
+        logger.warning(f"Additional kwargs: {kwargs}")
 
         # Correct the URL if protocol is missing or incorrect
         if not url.startswith("https://"):
-            corrected_url = re.sub(
-                r"^\w+://", "", url
-            )  # Remove existing protocol if invalid
+            corrected_url = re.sub(r"^\w+://", "", url)
             url = f"https://{corrected_url}"
-            logger.debug(f"Corrected URL to: {url}")
+            logger.warning(f"Corrected URL to: {url}")
 
         try:
-            # Log the final URL and request details
             async with httpx.AsyncClient() as client:
-                logger.debug(f"Sending request to URL: {url}")
+                logger.warning(f"Sending request to URL: {url}")
                 response = await client.request(method, url, headers=headers, **kwargs)
-                response.raise_for_status()  # Raise for HTTP error statuses
+                response.raise_for_status()
 
             # Log response details
-            logger.debug("Request succeeded")
-            logger.debug(f"Response Status Code: {response.status_code}")
-            logger.debug(f"Response Headers: {response.headers}")
-            logger.debug(f"Response Content: {response.content}")
+            logger.warning("Request succeeded")
+            logger.warning(f"Response Status Code: {response.status_code}")
+            logger.warning(f"Response Headers: {response.headers}")
+            logger.warning(f"Raw Response Content (bytes): {response.content}")
 
-            # Check and parse the response based on Content-Type
+            # Check the response type and parse JSON if applicable
             if response.headers.get("Content-Type") == "application/json":
                 json_response = response.json()
-                logger.debug(f"JSON Response: {json_response}")
+                logger.warning(f"Parsed JSON Response: {json_response}")
                 return json_response
             elif response.content:
-                text_response = response.text
-                logger.debug(f"Text Response: {text_response}")
+                text_response = response.content.decode("utf-8", errors="replace")
+                logger.warning(f"Text Response: {text_response}")
                 return {"text": text_response}
             else:
-                logger.debug("Empty response received")
+                logger.warning("Empty response received")
                 return {}
 
         except httpx.HTTPStatusError as exc:
-            # Log HTTP error details
             logger.error(f"HTTPStatusError occurred: {exc.response.status_code}")
             logger.error(f"Response content: {exc.response.content}")
 
-            # Parse and log error content if available
             try:
                 if exc.response.headers.get("Content-Type") == "application/json":
                     error_data = exc.response.json()
@@ -92,7 +87,6 @@ class AuthBase(ABC):
 
             logger.error(f"Error Code: {code}, Message: {message}")
 
-            # Raise appropriate custom errors based on status code
             if exc.response.status_code == 400:
                 raise BadRequestError(code=code, message=message) from exc
             elif exc.response.status_code == 401:
@@ -104,8 +98,7 @@ class AuthBase(ABC):
             else:
                 raise NetsapiensAPIError(code=code, message=message) from exc
         finally:
-            # Log exit from the method
-            logger.debug("Exiting AuthBase._request")
+            logger.warning("Exiting AuthBase._request")
 
 
 class ApiKeyAuth(AuthBase):
