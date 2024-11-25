@@ -114,3 +114,77 @@ class MessageAPI:
                     error_message = await response.text()
                     self.logger.error(f"Failed to send message: {error_message}")
                     raise Exception(f"Failed to send message: {error_message}")
+
+    async def get_messages(
+        self,
+        messagesession: Optional[str] = None,
+        domain: str = "~",
+        user: Optional[str] = None,
+        limit: Optional[int] = None,
+    ):
+        """
+        Retrieve message sessions or messages for a specific session.
+
+        :param messagesession: Optional session ID to retrieve messages for. If None, retrieves all message sessions.
+        :param domain: Domain to retrieve messages from. Defaults to "~" (current domain).
+        :param user: Optional user to retrieve messages for. If None, retrieves all sessions for the domain.
+        :param limit: Optional limit on the number of items to retrieve.
+        :return: A list of dictionaries representing message sessions or messages.
+        """
+        # Check and refresh token if necessary
+        try:
+            self.auth_data = await self.auth_client.check_token_expiry()
+        except Exception as e:
+            self.logger.error(f"Failed to refresh authentication token: {e}")
+            raise Exception("Authentication failed.") from e
+
+        if not self.auth_data:
+            self.logger.error(
+                "Authentication data is not available. Cannot retrieve messages."
+            )
+            raise Exception("Authentication data is not available.")
+
+        self.base_url = self.auth_data.get("api_url")
+
+        # Validate messagesession if provided
+        if messagesession:
+            # URL for retrieving messages in a specific session
+            url = f"{self.base_url}/ns-api/v2/domains/{domain}/users/{user or '~'}/messagesessions/{messagesession}/messages"
+        else:
+            # URL for retrieving all message sessions
+            if user:
+                url = f"{self.base_url}/ns-api/v2/domains/{domain}/users/{user}/messagesessions"
+            else:
+                url = f"{self.base_url}/ns-api/v2/domains/{domain}/messagesessions"
+
+        # Prepare query parameters
+        params = {}
+        if limit:
+            params["limit"] = str(limit)
+
+        self.logger.debug(f"Retrieving messages from {url} with params: {params}")
+
+        # Make the GET request
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {"Authorization": f"Bearer {self.auth_data['access_token']}"}
+                async with session.get(url, headers=headers, params=params) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        self.logger.info(f"Messages retrieved successfully from {url}.")
+                        return result
+                    else:
+                        error_message = await response.text()
+                        self.logger.error(
+                            f"Failed to retrieve messages from {url}. "
+                            f"Status: {response.status}, Error: {error_message}"
+                        )
+                        raise Exception(
+                            f"Failed to retrieve messages. Status: {response.status}, Error: {error_message}"
+                        )
+        except aiohttp.ClientError as e:
+            self.logger.error(f"Network error while retrieving messages: {e}")
+            raise Exception("Network error occurred while retrieving messages.") from e
+        except Exception as e:
+            self.logger.error(f"Unexpected error while retrieving messages: {e}")
+            raise Exception("An unexpected error occurred.") from e
