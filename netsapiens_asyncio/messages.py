@@ -1,7 +1,7 @@
 import aiohttp
 import logging
 from typing import Optional, Union
-from modules.auth import NetsapiensAPI
+from .auth import NetsapiensAPI
 
 
 class MessageAPI:
@@ -33,7 +33,7 @@ class MessageAPI:
 
         self.logger.debug("MessageAPI initialized with auth client")
 
-    async def new_message(
+    async def send_message(
         self,
         message_type: str,
         message: str,
