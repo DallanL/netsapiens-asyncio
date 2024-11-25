@@ -39,7 +39,7 @@ AUTH_CONFIG = {
 example usage:
 
 ```bash
-from modules.auth import NetsapiensAPI
+from netsapiens_asyncio.auth import NetsapiensAPI
 
 # build authentication dictionary
 AUTH_CONFIG = {
@@ -74,8 +74,8 @@ to send a new message use `new_message()`
 
 ```bash
 import asyncio
-from modules.auth import NetsapiensAPI
-from modules.messages import MessageAPI
+from netsapiens_asyncio.auth import NetsapiensAPI
+from netsapiens_asyncio.messages import MessageAPI
 
 dst_number = "16265550123"
 src_number = "12135550123"
