@@ -10,7 +10,7 @@ setup(
     author_email="Dallan@wedophones.com",
     url="https://github.com/DallanL/netsapiens-asyncio.git",
     packages=find_packages(),
-    install_requires=["httpx", "pydantic"],
+    install_requires=["aiohttp"],
     python_requires=">=3.7",
     classifiers=[
         "Programming Language :: Python :: 3",

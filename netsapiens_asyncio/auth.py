@@ -1,243 +1,45 @@
-from typing import Dict, Any
-from abc import ABC, abstractmethod
-import httpx
-from datetime import datetime, timezone, timedelta
+import aiohttp
 import logging
-import re
-from .exceptions import (
-    BadRequestError,
-    AuthenticationError,
-    ForbiddenError,
-    NotFoundError,
-    NetsapiensAPIError,
-)
-
-logger = logging.getLogger("nsaio.auth")
+from datetime import datetime, timezone, timedelta
 
 
-class AuthBase(ABC):
-    @abstractmethod
-    async def get_headers(self) -> Dict[str, str]:
-        """Retrieve headers for authentication."""
-        raise NotImplementedError("Must implement get_headers in subclass.")
+class NetsapiensAPI:
+    def __init__(self, auth_config: dict, log_level=logging.INFO):
+        """
+        Initialize the NetsapiensAPI class with authentication details and logging setup.
 
-    @abstractmethod
-    async def get_token_info(self) -> Dict[str, Any]:
-        """Retrieve metadata about the current token."""
-        raise NotImplementedError("Must implement get_token_info in subclass.")
+        :param auth_config: Dictionary containing authentication information.
+        :param log_level: Logging level (default is INFO).
+        """
+        self.base_url = auth_config.get("base_url")
+        self.client_id = auth_config.get("client_id")
+        self.client_secret = auth_config.get("client_secret")
+        self.username = auth_config.get("username")
+        self.password = auth_config.get("password")
+        self.token_data = None
 
-    async def _request(
-        self, method: str, url: str, headers=None, **kwargs
-    ) -> Dict[str, Any]:
-        """Helper method to manage HTTP requests with error handling and logging."""
+        # Create a dedicated logger for this class
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(log_level)
 
-        # Log entry to the method
-        logger.warning("Entering AuthBase._request")
-        logger.warning(f"HTTP Method: {method}")
-        logger.warning(f"Initial URL: {url}")
-        logger.warning(f"Headers: {headers}")
-        logger.warning(f"Additional kwargs: {kwargs}")
+        # Add a handler if the logger has no handlers (to avoid duplicate logs)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
-        # Correct the URL if protocol is missing or incorrect
-        if not url.startswith("https://"):
-            corrected_url = re.sub(r"^\w+://", "", url)
-            url = f"https://{corrected_url}"
-            logger.warning(f"Corrected URL to: {url}")
+        self.logger.debug("NetsapiensAPI initialized")
 
-        try:
-            async with httpx.AsyncClient() as client:
-                logger.warning(f"Sending request to URL: {url}")
-                response = await client.request(method, url, headers=headers, **kwargs)
-                response.raise_for_status()
+    async def get_token(self):
+        """
+        Asynchronously request a new OAuth2 token using the password grant.
 
-            # Log response details
-            logger.warning("Request succeeded")
-            logger.warning(f"Response Status Code: {response.status_code}")
-            logger.warning(f"Response Headers: {response.headers}")
-            logger.warning(f"Raw Response Content (bytes): {response.content}")
-
-            # Check the response type and parse JSON if applicable
-            if response.headers.get("Content-Type") == "application/json":
-                json_response = response.json()
-                logger.warning(f"Parsed JSON Response: {json_response}")
-                return json_response
-            elif response.content:
-                text_response = response.content.decode("utf-8", errors="replace")
-                logger.warning(f"Text Response: {text_response}")
-                return {"text": text_response}
-            else:
-                logger.warning("Empty response received")
-                return {}
-
-        except httpx.HTTPStatusError as exc:
-            logger.error(f"HTTPStatusError occurred: {exc.response.status_code}")
-            logger.error(f"Response content: {exc.response.content}")
-
-            try:
-                if exc.response.headers.get("Content-Type") == "application/json":
-                    error_data = exc.response.json()
-                    code = error_data.get("code", exc.response.status_code)
-                    message = error_data.get("message", exc.response.text)
-                else:
-                    code = exc.response.status_code
-                    message = exc.response.text
-            except ValueError:
-                code = exc.response.status_code
-                message = exc.response.text
-
-            logger.error(f"Error Code: {code}, Message: {message}")
-
-            if exc.response.status_code == 400:
-                raise BadRequestError(code=code, message=message) from exc
-            elif exc.response.status_code == 401:
-                raise AuthenticationError(code=code, message=message) from exc
-            elif exc.response.status_code == 403:
-                raise ForbiddenError(code=code, message=message) from exc
-            elif exc.response.status_code == 404:
-                raise NotFoundError(code=code, message=message) from exc
-            else:
-                raise NetsapiensAPIError(code=code, message=message) from exc
-        finally:
-            logger.warning("Exiting AuthBase._request")
-
-
-class ApiKeyAuth(AuthBase):
-    def __init__(self, api_key: str, server_url: str):
-        self.api_key = api_key
-        self.server_url = server_url
-
-    async def get_headers(self) -> Dict[str, str]:
-        """Return headers containing the API key."""
-        return {"Authorization": f"Bearer {self.api_key}", "accept": "application/json"}
-
-    async def get_token_info(self) -> Dict[str, Any]:
-        """Retrieve API key metadata by making a request to the API."""
-        url = f"https://{self.server_url}/ns-api/v2/apikeys/~"
-        headers = await self.get_headers()
-        return await self._request("GET", url, headers=headers)
-
-
-class JWTAuth(AuthBase):
-    def __init__(
-        self,
-        server_url: str,
-        client_id: str,
-        username: str,
-        password: str,
-        client_secret: str,
-    ):
-        self.server_url = server_url
-        self.client_id = client_id
-        self.username = username
-        self.password = password
-        self.client_secret = client_secret
-        self.access_token = None
-        self.token_expires_at = None
-
-    async def _fetch_token(self):
-        """Fetch a new JWT token."""
-        url = f"https://{self.server_url}/ns-api/v2/jwt"
-        response = await self._request(
-            "POST",
-            url,
-            headers={"content-type": "application/json", "accept": "application/json"},
-            json={
-                "grant_type": "password",
-                "client_id": self.client_id,
-                "username": self.username,
-                "password": self.password,
-                "client_secret": self.client_secret,
-            },
-        )
-        self.access_token = response["token"]
-        self.token_expires_at = datetime.now(timezone.utc) + timedelta(
-            minutes=60
-        )  # Set token expiry based on API info
-
-    async def _refresh_token(self):
-        """Refresh the JWT token."""
-        url = f"https://{self.server_url}/ns-api/v2/jwt"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "accept": "application/json",
-        }
-        response = await self._request(
-            "POST", url, headers=headers, json={"grant_type": "refresh_token"}
-        )
-        self.access_token = response["token"]
-        self.token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=60)
-
-    async def get_headers(self) -> Dict[str, str]:
-        """Retrieve headers with a valid JWT token, refreshing if needed."""
-        if not self.access_token or (
-            self.token_expires_at
-            and datetime.now(timezone.utc) >= self.token_expires_at
-        ):
-            await self._fetch_token()
-        return {
-            "Authorization": f"Bearer {self.access_token}",
-            "accept": "application/json",
-        }
-
-    async def get_token_info(self) -> Dict[str, Any]:
-        """Retrieve JWT token metadata."""
-        url = f"https://{self.server_url}/ns-api/v2/jwt"
-        headers = await self.get_headers()
-        return await self._request("GET", url, headers=headers)
-
-
-class OAuth2Auth(AuthBase):
-    def __init__(
-        self,
-        client_id: str,
-        client_secret: str,
-        username: str,
-        password: str,
-        server_url: str,
-    ):
-        logger.debug("Initializing OAuth2Auth")
-        logger.debug(f"Client ID: {client_id}, Server URL: {server_url}")
-
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.username = username
-        self.password = password
-        self.server_url = server_url
-        self.access_token = None
-        self.token_expires_at = None
-        self.token_url = f"https://{self.server_url}/ns-api/v2/tokens"
-        self.token_data = {}
-
-    async def _fetch_token(self):
-        """Fetch a new OAuth2 token using the resource owner credentials grant."""
-        logger.debug(f"Fetching new token from {self.token_url}")
-
-        try:
-            # Request the token from the primary token URL
-            response = await self._request_token(self.token_url)
-            logger.debug(f"Full token response: {response}")
-
-            # Ensure that we are storing the entire response
-            self.token_data = response
-            logger.debug(f"Token data stored: {self.token_data}")
-
-        except NetsapiensAPIError as e:
-            logger.error(f"Failed to fetch token: {e.message}")
-            raise e
-
-        # Set access token and expiration based on full token data
-        self.access_token = self.token_data.get("access_token")
-        expires_in = self.token_data.get("expires_in", 3600)
-        self.token_expires_at = datetime.now(timezone.utc) + timedelta(
-            seconds=expires_in
-        )
-        logger.debug(
-            f"Access token set. Expires in {expires_in} seconds at {self.token_expires_at}"
-        )
-
-    async def _request_token(self, url: str) -> Dict[str, Any]:
-        """Helper function to request a token from a given URL."""
-        logger.debug(f"Requesting token from {url}")
+        :return: A dictionary containing the token data.
+        """
+        url = f"https://{self.base_url}/ns-api/v2/tokens"
         payload = {
             "grant_type": "password",
             "client_id": self.client_id,
@@ -245,36 +47,101 @@ class OAuth2Auth(AuthBase):
             "username": self.username,
             "password": self.password,
         }
-        logger.debug(f"Token request payload: {payload}")
+        self.logger.debug(f"Requesting token with payload: {payload}")
 
-        response = await self._request(
-            "POST",
-            url,
-            headers={"content-type": "application/json", "accept": "application/json"},
-            json=payload,
-        )
-        logger.debug(f"Token response from server: {response}")
-        return response
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                if response.status == 200:
+                    token_data = await response.json()
+                    expires_in_seconds = token_data.get("expires_in", 0)
+                    token_data["expires_at"] = (
+                        datetime.now(timezone.utc)
+                        + timedelta(seconds=expires_in_seconds)
+                    ).strftime("%Y-%m-%d %H:%M:%S")
+                    token_data["api_url"] = f"https://{self.base_url}"
+                    self.token_data = token_data
+                    self.logger.info(
+                        f"Received new auth token: {self.token_data['access_token']}"
+                    )
+                    return self.token_data
+                else:
+                    error_message = await response.text()
+                    self.logger.error(f"Failed to get token: {error_message}")
+                    raise Exception(f"Failed to get token: {error_message}")
 
-    async def get_headers(self) -> Dict[str, str]:
-        """Retrieve headers with a valid OAuth2 token, refreshing if needed."""
-        if not self.access_token or (
-            self.token_expires_at
-            and datetime.now(timezone.utc) >= self.token_expires_at
-        ):
-            logger.debug("Access token is missing or expired; fetching a new token")
-            await self._fetch_token()
-        else:
-            logger.debug("Using existing access token")
+    async def refresh_access_token(self):
+        """
+        Asynchronously refresh the OAuth2 token.
 
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "accept": "application/json",
+        :return: A dictionary containing the new token data.
+        """
+        if not self.token_data or "refresh_token" not in self.token_data:
+            self.logger.error("No refresh token available. Please authenticate first.")
+            raise Exception("No refresh token available. Please authenticate first.")
+
+        url = f"https://{self.base_url}/ns-api/v2/tokens"
+        payload = {
+            "grant_type": "refresh_token",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "refresh_token": self.token_data["refresh_token"],
         }
-        logger.debug(f"Returning headers: {headers}")
-        return headers
+        self.logger.debug(f"Refreshing token with payload: {payload}")
 
-    async def get_token_info(self) -> Dict[str, Any]:
-        """Return the token data and metadata."""
-        logger.debug("Returning token information")
-        return self.token_data
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                if response.status == 200:
+                    token_data = await response.json()
+                    expires_in_seconds = token_data.get("expires_in", 0)
+                    token_data["expires_at"] = (
+                        datetime.now(timezone.utc)
+                        + timedelta(seconds=expires_in_seconds)
+                    ).strftime("%Y-%m-%d %H:%M:%S")
+                    token_data["api_url"] = f"https://{self.base_url}"
+                    self.token_data = token_data
+                    self.logger.info(
+                        f"Token refreshed successfully: {self.token_data['access_token']}"
+                    )
+                    return self.token_data
+                else:
+                    error_message = await response.text()
+                    self.logger.error(f"Failed to refresh token: {error_message}")
+                    raise Exception(f"Failed to refresh token: {error_message}")
+
+    async def check_token_expiry(self):
+        """
+        Check if the access token has expired. If expired, refresh it and update the token data.
+        Raises an exception if token data or expires_at is not available.
+
+        :return: Updated token data.
+        """
+        if not self.token_data:
+            self.logger.error("Token data is not available. Please authenticate first.")
+            raise Exception("Token data is missing. Authentication is required.")
+
+        if "expires_at" not in self.token_data:
+            self.logger.error(
+                "'expires_at' is missing in token data. Authentication failed."
+            )
+            raise Exception(
+                "'expires_at' is missing in token data. Cannot verify token validity."
+            )
+
+        # Parse the expiration time and make it timezone-aware
+        try:
+            expires_at = datetime.strptime(
+                self.token_data["expires_at"], "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=timezone.utc)
+        except ValueError as e:
+            self.logger.error(f"Invalid 'expires_at' format in token data: {e}")
+            raise Exception("Invalid 'expires_at' format in token data.") from e
+
+        now = datetime.now(timezone.utc)
+
+        # Check if the token has expired
+        if now >= expires_at:
+            self.logger.info("Access token has expired. Refreshing token...")
+            return await self.refresh_access_token()
+        else:
+            self.logger.info("Access token is still valid.")
+            return self.token_data
