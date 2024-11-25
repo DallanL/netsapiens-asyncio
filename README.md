@@ -134,8 +134,8 @@ Send a New Message in a New Session
 response = await message_client.send_message(
     message_type="sms",
     message="Hello, this is a test message!",
-    destination="+1234567890",
-    from_number="+0987654321",
+    destination="1234567890",
+    from_number="1987654321",
 )
 print("Response:", response)
 ```
@@ -145,8 +145,8 @@ Send a Message in an Existing Session
 response = await message_client.send_message(
     message_type="sms",
     message="This is a follow-up message in the session!",
-    destination="+1234567890",
-    from_number="+0987654321",
+    destination="1234567890",
+    from_number="1987654321",
     messagesession="valid_session_id_with_32_or_more_characters_1234"
 )
 print("Response:", response)
@@ -157,8 +157,8 @@ Send an MMS Message
 response = await message_client.send_message(
     message_type="mms",
     message="Here's a photo!",
-    destination=["+1234567890", "+0987654321"],
-    from_number="+11234567890",
+    destination=["1234567890", "1987654321"],
+    from_number="1234567899",
     data="base64_encoded_image_data",
     mime_type="image/jpeg",
     size=204800,  # 200 KB
