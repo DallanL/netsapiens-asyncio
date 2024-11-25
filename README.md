@@ -21,7 +21,7 @@ pip install --upgrade git+https://github.com/DallanL/netsapiens-asyncio.git
 
 # USAGE
 
-### Authentication:
+## Authentication:
 
 Create a dictionary with all needed authentication information and pass to the `NetsapiensAPI` class. then use the `get_token` method to return a dictionary containing all information about your token and other info to use that token with other API functions.
 
@@ -70,9 +70,9 @@ example response:
 
 One authenticated, pass the response from `get_token()` to any other function for them to be properly authenticated.
 
-### Messaging
+## Messaging
 
-#### send_message
+### send_message
 The `send_message` method allows you to send a message either to a new message session or to an existing session using the messagesession parameter.
 
 Method Signature
@@ -176,3 +176,83 @@ The messagesession parameter must:
 - Be at least 32 characters long.
 - Contain only alphanumeric characters and underscores (_).
 Otherwise, a ValueError is raised.
+
+
+## get_messages
+
+The `get_messages` method retrieves message sessions or messages for a specific session from the Netsapiens API. It supports optional filtering by domain, user, and limit.
+
+#### Method Signature
+
+```bash
+async def get_messages(
+    self,
+    messagesession: Optional[str] = None,
+    domain: str = "~",
+    user: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> list[dict]
+```
+
+#### Parameters
+
+domain (str):
+- The domain to retrieve messages from.
+- Defaults to "~", which refers to the domain linked to your token.
+
+user (Optional[str]):
+- The user to retrieve messages for.
+- If omitted, retrieves sessions for the entire domain.
+
+messagesession (Optional[str]):
+- The session ID to retrieve messages for.
+- If omitted, retrieves all message sessions for the given domain (or user, if provided).
+
+limit (Optional[int]):
+- Limits the number of sessions or messages retrieved.
+- Defaults to no limit.
+
+#### Returns
+An Array of dictionaries:
+- When messagesession is provided, each dictionary represents a message in the specified session.
+- When messagesession is not provided, each dictionary represents a message session.
+
+#### Raises
+ValueError:
+- If the messagesession ID is invalid (less than 32 characters or contains invalid characters).
+
+Exception:
+- If authentication fails or network/API errors occur.
+
+
+#### Examples
+Retrieve 50 Message Sessions for a Domain
+```bash
+response = await message_client.get_messages(
+    domain="testdomain.com",
+    limit=50,
+)
+print("Message Sessions:", response)
+```
+
+Retrieve All Message Sessions for a User
+```bash
+response = await message_client.get_messages(
+    domain="2132560400.com",
+    user="103",
+)
+print("User Message Sessions:", response)
+```
+
+Retrieve Messages for a Specific Session
+
+```bash
+response = await message_client.get_messages(
+    messagesession="2d51df1810812ace8d138a2558d0bd79",
+    domain="testdomain.com",
+    user="123",
+)
+print("Messages in Session:", response)
+```
+
+
