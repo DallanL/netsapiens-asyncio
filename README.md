@@ -39,23 +39,28 @@ AUTH_CONFIG = {
 example usage:
 
 ```bash
+import asyncio
 from netsapiens_asyncio.auth import NetsapiensAPI
+async def main():
 
-# build authentication dictionary
-AUTH_CONFIG = {
-    "base_url": "api.example.com",
-    "client_id": "your_client_id",
-    "client_secret": "your_client_secret",
-    "username": "your_username",
-    "password": "your_password",
-}
+	# build authentication dictionary
+	AUTH_CONFIG = {
+	    "base_url": "api.example.com",
+	    "client_id": "your_client_id",
+	    "client_secret": "your_client_secret",
+	    "username": "your_username",
+	    "password": "your_password",
+	}
 
-# Initialize the authentication client
-auth_client = NetsapiensAPI(AUTH_CONFIG)
-# Fetch the initial token
-response = await auth_client.get_token()
+	# Initialize the authentication client
+	auth_client = NetsapiensAPI(AUTH_CONFIG)
+	# Fetch the initial token
+	response = await auth_client.get_token()
 
-print("Token Info:", response)
+	print("Token Info:", response)
+
+asyncio.run(main())
+
 ```
 
 example response:
@@ -70,38 +75,41 @@ One authenticated, pass the response from `get_token()` to any other function fo
 to send a message, once you have the auth dictionary you can start a new message using the `MessageAPI` class:
 
 
-to send a message use `send_message()`
+to send a message use `send_message()` (if you are continuing a previous message session, define the `messagesession`, otherwise a new session will be created)
 
 ```bash
 import asyncio
 from netsapiens_asyncio.auth import NetsapiensAPI
 from netsapiens_asyncio.messages import MessageAPI
 
-dst_number = "16265550123"
-src_number = "12135550123"
+async def main():
+	dst_number = "16265550123"
+	src_number = "12135550123"
 
-AUTH_CONFIG = {
-    "base_url": "api.example.com",
-    "client_id": "your_client_id",
-    "client_secret": "your_client_secret",
-    "username": "your_username",
-    "password": "your_password",
-}
+	AUTH_CONFIG = {
+	    "base_url": "api.example.com",
+	    "client_id": "your_client_id",
+	    "client_secret": "your_client_secret",
+	    "username": "your_username",
+	    "password": "your_password",
+	}
 
-# Initialize the authentication client
-auth_client = NetsapiensAPI(AUTH_CONFIG)
-# Fetch the initial token
-response = await auth_client.get_token()
+	# Initialize the authentication client
+	auth_client = NetsapiensAPI(AUTH_CONFIG)
+	# Fetch the initial token
+	response = await auth_client.get_token()
 
 
-# Initialize the message API client
-message_client = MessageAPI(auth_client)
-response = await message_client.send_message(
-    message_type="sms",
-    message="Hey, this is a test message via api!",
-    destination=dst_number,
-    from_number=src_number,
-)
-print("Message Response:", response)
+	# Initialize the message API client
+	message_client = MessageAPI(auth_client)
+	response = await message_client.send_message(
+	    message_type="sms",
+	    message="Hey, this is a test message via api!",
+	    destination=dst_number,
+	    from_number=src_number,
+	)
+	print("Message Response:", response)
+
+asyncio.run(main())
 ```
 
