@@ -70,7 +70,7 @@ One authenticated, pass the response from `get_token()` to any other function fo
 to send a message, once you have the auth dictionary you can start a new message using the `MessageAPI` class:
 
 
-to send a new message use `new_message()`
+to send a message use `send_message()`
 
 ```bash
 import asyncio
@@ -96,7 +96,7 @@ response = await auth_client.get_token()
 
 # Initialize the message API client
 message_client = MessageAPI(auth_client)
-response = await message_client.new_message(
+response = await message_client.send_message(
     message_type="sms",
     message="Hey, this is a test message via api!",
     destination=dst_number,
@@ -104,3 +104,4 @@ response = await message_client.new_message(
 )
 print("Message Response:", response)
 ```
+
