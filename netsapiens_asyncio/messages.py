@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+import re
 from typing import Optional, Union
 from .auth import NetsapiensAPI
 
@@ -39,17 +40,20 @@ class MessageAPI:
         message: str,
         destination: Union[str, list],
         from_number: str,
+        messagesession: Optional[str] = None,  # New optional parameter
         data: Optional[str] = None,
         mime_type: Optional[str] = None,
         size: Optional[int] = None,
     ):
         """
-        Send a new message session via the API.
+        Send a message via the API, either to a new session or an existing session.
 
         :param message_type: Type of message to send (e.g., sms, mms).
         :param message: The text of the message to be sent.
         :param destination: A single recipient (str) or a list of recipients (List[str]).
         :param from_number: Sender's phone number (required for SMS).
+        :param messagesession: Optional session ID to send the message in. If provided,
+                               must be at least 32 characters long, alphanumeric, and underscores.
         :param data: Base64-encoded data for MMS or media chat.
         :param mime_type: Mime type of the media file for MMS or media chat.
         :param size: Size of the media file in bytes for MMS or media chat.
@@ -65,7 +69,20 @@ class MessageAPI:
 
         self.base_url = self.auth_data.get("api_url")
 
-        url = f"{self.base_url}/ns-api/v2/domains/{self.domain}/users/{self.user}/messages"
+        # Validate the messagesession if provided
+        if messagesession:
+            if not re.match(r"^[a-zA-Z0-9_]{32,}$", messagesession):
+                self.logger.error("Invalid messagesession ID format.")
+                raise ValueError(
+                    "Invalid messagesession ID. Must be at least 32 characters long, alphanumeric, and underscores only."
+                )
+            # Use the session in the URL if provided
+            url = f"{self.base_url}/ns-api/v2/domains/{self.domain}/users/{self.user}/messagesessions/{messagesession}/messages"
+        else:
+            # Use the default new message URL
+            url = f"{self.base_url}/ns-api/v2/domains/{self.domain}/users/{self.user}/messages"
+
+        # Prepare the payload
         payload = {
             "type": message_type,
             "message": message,
@@ -85,6 +102,7 @@ class MessageAPI:
 
         self.logger.debug(f"Sending message with payload: {payload}")
 
+        # Make the POST request
         async with aiohttp.ClientSession() as session:
             headers = {"Authorization": f"Bearer {self.auth_data['access_token']}"}
             async with session.post(url, json=payload, headers=headers) as response:
