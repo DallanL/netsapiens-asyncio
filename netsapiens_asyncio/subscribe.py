@@ -110,7 +110,7 @@ class SubscriptionAPI:
             headers = {"Authorization": f"Bearer {self.auth_data['access_token']}"}
             try:
                 async with session.post(url, json=payload, headers=headers) as response:
-                    if response.status == 201:
+                    if response.status == 200:
                         result = await response.json()
                         self.logger.info(f"Subscription created successfully: {result}")
                         return result
@@ -297,7 +297,7 @@ class SubscriptionAPI:
             headers = {"Authorization": f"Bearer {self.auth_data['access_token']}"}
             try:
                 async with session.put(url, json=payload, headers=headers) as response:
-                    if response.status == 200:
+                    if response.status == 202:
                         result = await response.json()
                         self.logger.info(
                             f"Subscription {subscription_id} updated successfully: {result}"
@@ -358,7 +358,7 @@ class SubscriptionAPI:
             headers = {"Authorization": f"Bearer {self.auth_data['access_token']}"}
             try:
                 async with session.delete(url, headers=headers) as response:
-                    if response.status == 200:
+                    if response.status == 202:
                         result = await response.json()
                         self.logger.info(
                             f"Subscription {subscription_id} deleted successfully: {result}"
