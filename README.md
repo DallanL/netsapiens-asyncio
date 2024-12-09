@@ -255,4 +255,188 @@ response = await message_client.get_messages(
 print("Messages in Session:", response)
 ```
 
+# SubscriptionAPI Documentation
+
+The `SubscriptionAPI` class provides methods to interact with the Netsapiens API for managing event subscriptions. It includes functionality to create, read, update, and delete subscriptions.
+
+---
+
+## **Initialization**
+
+To use the `SubscriptionAPI` class, you need to initialize it with an authenticated instance of `NetsapiensAPI`.
+
+### Example Initialization
+```python
+from netsapiens_asyncio.auth import NetsapiensAPI
+from netsapiens_asyncio.subscribe import SubscriptionAPI
+from config import AUTH_CONFIG
+
+# Initialize the authentication client
+auth_client = NetsapiensAPI(AUTH_CONFIG)
+
+# Fetch the authentication token
+await auth_client.get_token()
+
+# Initialize the SubscriptionAPI client
+subscription_client = SubscriptionAPI(auth_client)
+```
+
+### Methods
+
+#### create_subscription
+
+Creates a new event subscription.
+
+Method Signature
+```python
+async def create_subscription(
+    self,
+    model: str,
+    post_url: str,
+    subscription_geo_support: Optional[str] = "yes",
+    reseller: Optional[str] = "*",
+    domain: Optional[str] = "*",
+    user: Optional[str] = "*",
+    preferred_server: Optional[str] = None,
+) -> dict:
+```
+
+Example Usage
+```python
+response = await subscription_client.create_subscription(
+    model="message",
+    post_url="https://example.com/callback",
+    subscription_geo_support="yes",
+    domain="company.com",
+    user="101",
+    preferred_server="core1.nms-server.com"
+)
+print(response)
+```
+
+Expected Response
+```json
+{
+    "id": "603559d421797c7b09b904ea9b6e6079",
+    "model": "message",
+    "post-url": "https://example.com/callback",
+    "subscription-geo-support": "yes",
+    "user": "101",
+    "domain": "company.com",
+    "preferred-server": "core1.nms-server.com",
+    "status": "pending",
+    "error-count": 0,
+    "posts-count": 0,
+    "subscription-creation-datetime": "2024-12-09T21:27:11+00:00",
+    "subscription-expires-datetime": "2024-12-09T22:27:11+00:00"
+}
+```
+
+---
+
+#### read_subscription
+
+Reads a subscription by its ID or fetches all subscriptions if no ID is provided.
+
+Method Signature
+```python
+async def read_subscription(self, subscription_id: Optional[str] = None) -> Union[dict, list[dict]]:
+```
+
+Example Usage
+Read a Specific Subscription
+```python
+response = await subscription_client.read_subscription(subscription_id="603559d421797c7b09b904ea9b6e6079")
+print(response)
+```
+
+Read All Subscriptions
+```python
+response = await subscription_client.read_subscription()
+print(response)
+```
+
+Expected Response
+For a Specific Subscription
+```json
+{
+    "id": "603559d421797c7b09b904ea9b6e6079",
+    "model": "message",
+    "post-url": "https://example.com/callback",
+    "subscription-geo-support": "yes",
+    "user": "101",
+    "domain": "company.com",
+    "preferred-server": "core1.nms-server.com",
+    "status": "pending",
+    "error-count": 0,
+    "posts-count": 0,
+    "subscription-creation-datetime": "2024-12-09T21:27:11+00:00",
+    "subscription-expires-datetime": "2024-12-09T22:27:11+00:00"
+}
+```
+
+---
+
+#### update_subscription
+
+Updates an existing subscription.
+
+Method Signature
+```python
+async def update_subscription(
+    self,
+    subscription_id: str,
+    model: Optional[str] = None,
+    post_url: Optional[str] = None,
+    subscription_geo_support: Optional[str] = None,
+    subscription_expires_datetime: Optional[str] = None,
+    preferred_server: Optional[str] = None,
+    error_count: Optional[int] = None,
+    posts_count: Optional[int] = None,
+) -> dict:
+```
+
+Example Usage
+```python
+response = await subscription_client.update_subscription(
+    subscription_id="603559d421797c7b09b904ea9b6e6079",
+    model="cdr"
+)
+print(response)
+```
+
+Expected Response
+```json
+{
+    "code": 202,
+    "message": "Accepted"
+}
+```
+
+---
+
+#### delete_subscription
+
+Deletes a subscription by its ID.
+
+Method Signature
+```python
+async def delete_subscription(self, subscription_id: str) -> dict:
+```
+
+Example Usage
+```python
+response = await subscription_client.delete_subscription(subscription_id="603559d421797c7b09b904ea9b6e6079")
+print(response)
+```
+
+Expected Response
+```json
+{
+    "code": 202,
+    "message": "Accepted"
+}
+```
+
+
 
