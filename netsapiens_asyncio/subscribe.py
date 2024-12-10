@@ -82,13 +82,8 @@ class SubscriptionAPI:
 
         # Refresh token if necessary
         self.auth_data = await self.auth_client.check_token_expiry()
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot create subscription."
-            )
-            raise Exception("Authentication data is not available.")
-
         self.base_url = self.auth_data.get("api_url")
+
         url = f"{self.base_url}/ns-api/v2/subscriptions"
 
         # Construct payload
@@ -144,14 +139,8 @@ class SubscriptionAPI:
         :param subscription_id: Optional. The ID of the subscription to retrieve.
         :return: A dictionary for a specific subscription or a list of dictionaries for all subscriptions.
         """
-        # Refresh token if necessary
+        # Check and refresh token if necessary
         self.auth_data = await self.auth_client.check_token_expiry()
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot retrieve subscription(s)."
-            )
-            raise Exception("Authentication data is not available.")
-
         self.base_url = self.auth_data.get("api_url")
 
         # Construct URL based on whether subscription_id is provided
@@ -253,15 +242,10 @@ class SubscriptionAPI:
                     "Invalid datetime format for subscription_expires_datetime. Expected format is 'YYYY-MM-DD HH:MM:SS'."
                 )
 
-        # Refresh token if necessary
+        # Check and refresh token if necessary
         self.auth_data = await self.auth_client.check_token_expiry()
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot update subscription."
-            )
-            raise Exception("Authentication data is not available.")
-
         self.base_url = self.auth_data.get("api_url")
+
         url = f"{self.base_url}/ns-api/v2/subscriptions/{subscription_id}"
 
         # Build the payload
@@ -339,14 +323,8 @@ class SubscriptionAPI:
             self.logger.error("Subscription ID is required.")
             raise ValueError("Subscription ID is required.")
 
-        # Refresh token if necessary
+        # Check and refresh token if necessary
         self.auth_data = await self.auth_client.check_token_expiry()
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot delete subscription."
-            )
-            raise Exception("Authentication data is not available.")
-
         self.base_url = self.auth_data.get("api_url")
 
         # Construct the URL

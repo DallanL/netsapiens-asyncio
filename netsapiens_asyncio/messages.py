@@ -61,12 +61,6 @@ class MessageAPI:
         """
         # Check and refresh token if necessary
         self.auth_data = await self.auth_client.check_token_expiry()
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot send message."
-            )
-            raise Exception("Authentication data is not available.")
-
         self.base_url = self.auth_data.get("api_url")
 
         # Validate the messagesession if provided
@@ -132,18 +126,7 @@ class MessageAPI:
         :return: A list of dictionaries representing message sessions or messages.
         """
         # Check and refresh token if necessary
-        try:
-            self.auth_data = await self.auth_client.check_token_expiry()
-        except Exception as e:
-            self.logger.error(f"Failed to refresh authentication token: {e}")
-            raise Exception("Authentication failed.") from e
-
-        if not self.auth_data:
-            self.logger.error(
-                "Authentication data is not available. Cannot retrieve messages."
-            )
-            raise Exception("Authentication data is not available.")
-
+        self.auth_data = await self.auth_client.check_token_expiry()
         self.base_url = self.auth_data.get("api_url")
 
         # Validate messagesession if provided
